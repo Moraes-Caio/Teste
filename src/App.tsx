@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Patients from "./pages/Patients";
 import Appointments from "./pages/Appointments";
@@ -19,7 +20,6 @@ import ForgotPassword from "./pages/ForgotPassword";
 import Onboarding from "./pages/Onboarding";
 import MemberSetup from "./pages/MemberSetup";
 import AuthCallback from "./pages/AuthCallback";
-// AcceptInvite page removed
 import NoAccess from "./pages/NoAccess";
 import NotFound from "./pages/NotFound";
 import { PermissionRoute } from "./components/PermissionRoute";
@@ -54,7 +54,6 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
     let cancelled = false;
     (async () => {
       const sbClient = (await import("@/integrations/supabase/client")).supabase;
-      // Try by user_id first, then fallback to email
       let { data } = await sbClient
         .from('team_members')
         .select('id, user_id, is_owner, password_changed')
@@ -75,13 +74,10 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
       if (!data || data.length === 0) {
         setAccessState('no-access');
       } else if (!data[0].is_owner && !data[0].user_id) {
-        // Invited member, first login — needs setup
         setAccessState('member-setup');
       } else if (data[0].is_owner) {
-        // Owner — needs onboarding check
         setAccessState('owner');
       } else {
-        // Non-owner member with user_id already linked — fully onboarded
         setAccessState('ok');
       }
     })();
@@ -95,14 +91,12 @@ const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   if (accessState === 'member-setup') return <Navigate to="/member-setup" replace />;
   if (accessState === 'ok') return <>{children}</>;
 
-  // Owner: check onboarding status
   if (accessState === 'owner') {
     if (onboardingCompleted === null) return <LoadingSpinner />;
     if (onboardingCompleted === false) return <Navigate to="/onboarding" replace />;
     return <>{children}</>;
   }
 
-  // No team_member found at all
   if (accessState === 'no-access') {
     if (onboardingCompleted === null) return <LoadingSpinner />;
     if (onboardingCompleted === false) return <Navigate to="/onboarding" replace />;
@@ -160,10 +154,9 @@ const AppRoutes = () => (
   <>
     <SessionConflictDialog />
     <Routes>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<Index />} />
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-      {/* /invite/:token route removed */}
       <Route path="/no-access" element={<NoAccess />} />
       <Route path="/esqueci-senha" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
       <Route path="/onboarding" element={<OnboardingRoute><Onboarding /></OnboardingRoute>} />
@@ -183,7 +176,6 @@ const AppRoutes = () => (
 );
 
 const App = () => {
-  // Global: prevent scroll from changing number input values
   React.useEffect(() => {
     const handler = (e: WheelEvent) => {
       const target = e.target as HTMLElement;

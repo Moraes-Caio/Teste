@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMemberInfo } from '@/hooks/useMemberInfo';
+import { useProfile } from '@/hooks/useProfile';
 import { type RolePermissions } from '@/types';
 import {
   LayoutDashboard,
@@ -64,12 +65,12 @@ function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const { member, role, isOwner, hasPermission } = useMemberInfo();
+  const { profile } = useProfile();
 
-  const userName = member?.fullName || 'Usuário';
+  const userName = profile?.full_name || member?.fullName || 'Usuário';
   const roleName = role?.name || 'Membro';
   const initials = getInitials(userName);
 
-  // Filter menu items by permissions
   const visibleItems = menuItems.filter(item => {
     if (item.alwaysVisible) return true;
     if (isOwner) return true;
@@ -77,9 +78,6 @@ function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
     return true;
   });
 
-  // For clinic name, we use profileId context - but we need to get it from somewhere
-  // Since we removed useProfile dependency for clinic name in sidebar for members,
-  // we'll keep it simple
   const handleProfileClick = () => {
     navigate('/configuracoes?tab=account');
     onItemClick?.();

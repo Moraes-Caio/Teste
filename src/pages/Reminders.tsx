@@ -141,7 +141,6 @@ export default function Reminders() {
 
   const handleCloseDialog = () => { setIsDialogOpen(false); resetForm(); };
 
-  // Webhook: Generate message
   const availableVariables = [
     { key: '{nome_paciente}', description: 'Nome completo do paciente' },
     { key: '{nome_responsavel}', description: 'Nome do responsável (ou do paciente se não houver)' },
@@ -178,55 +177,41 @@ export default function Reminders() {
     return payload;
   };
 
-  const callAiMessage = async (payload: Record<string, any>) => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData?.session?.access_token;
-    if (!token) throw new Error('Não autenticado');
-
-    const res = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/n8n-webhook?action=ai-message`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-        },
-        body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(30000),
-      }
-    );
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Erro no serviço');
-    }
-    return res.json();
-  };
-
   const handleGenerateMessage = async () => {
     setIsGenerating(true);
     try {
-      const data = await callAiMessage(buildWebhookPayload('gerar'));
-      if (!data.mensagem) {
-        toast({ title: 'Erro', description: 'Resposta inesperada do serviço.', variant: 'destructive' });
-        return;
-      }
+      const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_GERAR_MENSAGEM;
+      if (!webhookUrl) throw new Error('URL de geração de mensagem não configurada.');
+
+      const payload = buildWebhookPayload('gerar');
+
+      const res = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error('Falha ao gerar mensagem via webhook.');
+      const data = await res.json();
+      
+      let mensagem = data.mensagem || data.output || (Array.isArray(data) && data[0]?.output) || JSON.stringify(data);
+      mensagem = String(mensagem).replace(/\\n/g, '\n');
+
       if (formData.messageTemplate.trim()) {
-        setPendingMessage(data.mensagem);
+        setPendingMessage(mensagem);
         setConfirmReplace(true);
       } else {
-        setFormData(prev => ({ ...prev, messageTemplate: data.mensagem }));
-        editorRef.current?.setContent(data.mensagem);
+        setFormData(prev => ({ ...prev, messageTemplate: mensagem }));
+        editorRef.current?.setContent(mensagem);
         toast({ title: 'Mensagem gerada!', description: 'A mensagem foi criada com sucesso.' });
       }
     } catch (err: any) {
-      toast({ title: 'Erro', description: 'Não foi possível conectar ao serviço de IA. Tente novamente.', variant: 'destructive' });
+      toast({ title: 'Erro', description: err.message || 'Não foi possível conectar ao serviço de IA.', variant: 'destructive' });
     } finally {
       setIsGenerating(false);
     }
   };
 
-  // Webhook: Improve message
   const handleImproveWithAI = async () => {
     if (!formData.messageTemplate.trim()) {
       toast({ title: 'Erro', description: 'Escreva uma mensagem primeiro para melhorar com IA.', variant: 'destructive' });
@@ -235,16 +220,28 @@ export default function Reminders() {
 
     setIsImproving(true);
     try {
-      const data = await callAiMessage(buildWebhookPayload('melhorar'));
-      if (!data.mensagem) {
-        toast({ title: 'Erro', description: 'Resposta inesperada do serviço.', variant: 'destructive' });
-        return;
-      }
-      setFormData(prev => ({ ...prev, messageTemplate: data.mensagem }));
-      editorRef.current?.setContent(data.mensagem);
+      const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_MELHORAR_MENSAGEM;
+      if (!webhookUrl) throw new Error('URL de melhoria de mensagem não configurada.');
+
+      const payload = buildWebhookPayload('melhorar');
+
+      const res = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) throw new Error('Falha ao melhorar mensagem via webhook.');
+      const data = await res.json();
+      
+      let mensagem = data.mensagem || data.output || (Array.isArray(data) && data[0]?.output) || JSON.stringify(data);
+      mensagem = String(mensagem).replace(/\\n/g, '\n');
+
+      setFormData(prev => ({ ...prev, messageTemplate: mensagem }));
+      editorRef.current?.setContent(mensagem);
       toast({ title: 'Mensagem melhorada!', description: 'A IA aprimorou sua mensagem.' });
     } catch (err: any) {
-      toast({ title: 'Erro', description: 'Não foi possível conectar ao serviço de IA. Tente novamente.', variant: 'destructive' });
+      toast({ title: 'Erro', description: err.message || 'Não foi possível conectar ao serviço de IA.', variant: 'destructive' });
     } finally {
       setIsImproving(false);
     }
@@ -638,7 +635,6 @@ export default function Reminders() {
       </AlertDialog>
 
       <ManageProceduresDialog open={isProceduresOpen} onOpenChange={setIsProceduresOpen} onProcedureUpdated={(updatedProc) => {
-        // If the updated procedure is the one selected in the form, sync the interval
         if (formData.procedureId === updatedProc.id) {
           const days = updatedProc.return_interval_days;
           if (days && days > 0) {
