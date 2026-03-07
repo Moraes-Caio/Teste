@@ -27,8 +27,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { ManageProceduresDialog } from '@/components/procedures/ManageProceduresDialog';
 import { VariableEditor, type VariableEditorRef } from '@/components/reminders/VariableEditor';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Reminders() {
+  const { user } = useAuth();
   const { templates: reminderTemplates, addTemplate, updateTemplate, deleteTemplate, isLoading } = useReminderTemplates();
   const { procedures } = useProcedures();
   const [isProceduresOpen, setIsProceduresOpen] = useState(false);
@@ -70,12 +72,10 @@ export default function Reminders() {
 
   const filteredTemplates = useMemo(() => {
     return reminderTemplates.filter((t) => {
-      // Filter 1
       if (filterType === 'active' && !t.is_active) return false;
       if (filterType === 'inactive' && t.is_active) return false;
       if (filterType === 'appointment_confirmation' && t.type !== 'appointment_confirmation') return false;
       if (filterType === 'periodic_return' && t.type !== 'periodic_return') return false;
-      // Filter 2
       if (filterProcedure !== 'all' && t.procedure_name !== filterProcedure) return false;
       return true;
     });
@@ -91,7 +91,6 @@ export default function Reminders() {
     setSelectedTemplate(null);
   };
 
-  // Convert days to best-fit display unit
   const daysToDisplayUnit = (days: number): { value: number; unit: 'days' | 'weeks' | 'months' | 'years' } => {
     if (days > 0 && days % 365 === 0) return { value: days / 365, unit: 'years' };
     if (days > 0 && days % 30 === 0) return { value: days / 30, unit: 'months' };
@@ -99,7 +98,6 @@ export default function Reminders() {
     return { value: days, unit: 'days' };
   };
 
-  // Convert display unit back to days
   const displayUnitToDays = (value: number, unit: string): number => {
     if (unit === 'years') return value * 365;
     if (unit === 'months') return value * 30;
@@ -110,7 +108,6 @@ export default function Reminders() {
   const handleOpenDialog = (template?: ReminderTemplateRow) => {
     if (template) {
       setSelectedTemplate(template);
-      // For periodic_return with a linked procedure, use the procedure's current interval
       let intervalDays = template.return_interval || 0;
       if (template.type === 'periodic_return' && template.procedure_id) {
         const linkedProc = procedures.find(p => p.id === template.procedure_id);
@@ -141,49 +138,19 @@ export default function Reminders() {
 
   const handleCloseDialog = () => { setIsDialogOpen(false); resetForm(); };
 
-  const availableVariables = [
-    { key: '{nome_paciente}', description: 'Nome completo do paciente' },
-    { key: '{nome_responsavel}', description: 'Nome do responsável (ou do paciente se não houver)' },
-    { key: '{idade}', description: 'Idade do paciente' },
-    { key: '{procedimento}', description: 'Nome do procedimento' },
-    { key: '{data}', description: 'Data da consulta ou retorno' },
-    { key: '{horario}', description: 'Horário da consulta' },
-    { key: '{clinica}', description: 'Nome da clínica' },
-  ];
-
-  const getSelectedProcedureInfo = () => {
-    if (!formData.procedureName) return null;
-    const proc = procedures.find(p => p.title === formData.procedureName);
-    if (!proc) return { titulo: formData.procedureName };
-    return {
-      titulo: proc.title,
-      descricao: proc.description || '',
-      duracao_minutos: proc.duration_minutes || null,
-      intervalo_retorno_dias: proc.return_interval_days || null,
-    };
-  };
-
-  const buildWebhookPayload = (acao: 'gerar' | 'melhorar') => {
-    const payload: Record<string, any> = {
-      acao,
-      tipo_lembrete: formData.type === 'periodic_return' ? 'retorno_periodico' : 'confirmacao_consulta',
-      procedimento: formData.procedureName || '',
-      informacoes_procedimento: getSelectedProcedureInfo(),
-      variaveis_disponiveis: availableVariables,
-    };
-    if (acao === 'melhorar') {
-      payload.mensagem_atual = formData.messageTemplate;
-    }
-    return payload;
-  };
-
   const handleGenerateMessage = async () => {
     setIsGenerating(true);
     try {
       const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_GERAR_MENSAGEM;
       if (!webhookUrl) throw new Error('URL de geração de mensagem não configurada.');
 
-      const payload = buildWebhookPayload('gerar');
+      const commands = formData.messageTemplate.match(/\{[^}]+\}/g) || [];
+      const payload = {
+        user_id: user?.id,
+        message_content: formData.messageTemplate,
+        commands: Array.from(new Set(commands)),
+        request_type: 'generate',
+      };
 
       const res = await fetch(webhookUrl, {
         method: 'POST',
@@ -194,7 +161,7 @@ export default function Reminders() {
       if (!res.ok) throw new Error('Falha ao gerar mensagem via webhook.');
       const data = await res.json();
       
-      let mensagem = data.mensagem || data.output || (Array.isArray(data) && data[0]?.output) || JSON.stringify(data);
+      let mensagem = data.mensagem || data.output || data.text || (Array.isArray(data) && data[0]?.output) || JSON.stringify(data);
       mensagem = String(mensagem).replace(/\\n/g, '\n');
 
       if (formData.messageTemplate.trim()) {
@@ -223,7 +190,13 @@ export default function Reminders() {
       const webhookUrl = import.meta.env.VITE_N8N_WEBHOOK_MELHORAR_MENSAGEM;
       if (!webhookUrl) throw new Error('URL de melhoria de mensagem não configurada.');
 
-      const payload = buildWebhookPayload('melhorar');
+      const commands = formData.messageTemplate.match(/\{[^}]+\}/g) || [];
+      const payload = {
+        user_id: user?.id,
+        message_content: formData.messageTemplate,
+        commands: Array.from(new Set(commands)),
+        request_type: 'improve',
+      };
 
       const res = await fetch(webhookUrl, {
         method: 'POST',
@@ -234,7 +207,7 @@ export default function Reminders() {
       if (!res.ok) throw new Error('Falha ao melhorar mensagem via webhook.');
       const data = await res.json();
       
-      let mensagem = data.mensagem || data.output || (Array.isArray(data) && data[0]?.output) || JSON.stringify(data);
+      let mensagem = data.mensagem || data.output || data.text || (Array.isArray(data) && data[0]?.output) || JSON.stringify(data);
       mensagem = String(mensagem).replace(/\\n/g, '\n');
 
       setFormData(prev => ({ ...prev, messageTemplate: mensagem }));
@@ -330,7 +303,7 @@ export default function Reminders() {
   };
 
   const handleDuplicate = async (template: ReminderTemplateRow) => {
-    const baseName = `Copia do ${template.name}`;
+    const baseName = `Cópia de ${template.name}`;
     let newName = baseName;
     let counter = 1;
     while (reminderTemplates.some((t) => t.name === newName)) {
@@ -476,7 +449,6 @@ export default function Reminders() {
             <Card><CardContent className="flex flex-col items-center justify-center py-8 text-center"><Bell className="h-12 w-12 text-muted-foreground/50" /><p className="mt-3 text-sm text-muted-foreground">Nenhum lembrete encontrado com os filtros selecionados</p></CardContent></Card>
           ) : (
             <>
-              {/* Seção: Confirmação de Consulta */}
               {confirmationTemplates.length > 0 && (
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
@@ -489,12 +461,10 @@ export default function Reminders() {
                 </div>
               )}
 
-              {/* Divisor */}
               {confirmationTemplates.length > 0 && returnTemplates.length > 0 && (
                 <hr className="border-border" />
               )}
 
-              {/* Seção: Retorno Periódico */}
               {returnTemplates.length > 0 && (
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
@@ -613,7 +583,6 @@ export default function Reminders() {
         </DialogContent>
       </Dialog>
 
-      {/* Confirm replace dialog */}
       <AlertDialog open={confirmReplace} onOpenChange={setConfirmReplace}>
         <AlertDialogContent>
           <AlertDialogHeader>
