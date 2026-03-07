@@ -45,6 +45,8 @@ import { toast } from '@/hooks/use-toast';
 import { calculateAge, formatDate, cn } from '@/lib/utils';
 import { relationLabels, genderLabels, type RelationType, type Gender } from '@/types';
 import { Plus, Search, Pencil, Trash2, Users, Filter, Loader2 } from 'lucide-react';
+import { format, subYears, parseISO } from 'date-fns';
+import { PatientHistoryDialog } from '@/components/patients/PatientHistoryDialog';
 
 function HighlightText({ text, query, active }: { text: string; query: string; active: boolean }) {
   if (!active || !query.trim()) return <>{text}</>;
@@ -60,8 +62,6 @@ function HighlightText({ text, query, active }: { text: string; query: string; a
     </>
   );
 }
-import { format, subYears, parseISO } from 'date-fns';
-import { PatientHistoryDialog } from '@/components/patients/PatientHistoryDialog';
 
 type SearchFilter = 'patient' | 'responsible' | 'age' | 'phone';
 
