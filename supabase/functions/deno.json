@@ -1,8 +1,8 @@
 {
   "_versions": {
-    "n8n-webhook": 36,
-    "accept-invite": 15,
-    "get-invite-info": 15,
-    "send-invite": 17
+    "n8n-webhook": 38,
+    "accept-invite": 17,
+    "get-invite-info": 17,
+    "send-invite": 19
   }
 }
