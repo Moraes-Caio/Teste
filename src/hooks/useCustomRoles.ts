@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Database } from '@/integrations/supabase/types';
 import type { RolePermissions } from '@/types';
-import { allPermissionsEnabled } from '@/types';
+import { allPermissionsEnabled, defaultRolePermissions } from '@/types';
 
 type CustomRoleRow = Database['public']['Tables']['custom_roles']['Row'];
 
@@ -17,7 +17,7 @@ const defaultRoles: CustomRoleRow[] = [
     description: 'Acesso completo ao sistema',
     icon: '👨‍💼',
     color: '#3b82f6',
-    permissions: allPermissionsEnabled as unknown as Database['public']['Tables']['custom_roles']['Row']['permissions'],
+    permissions: defaultRolePermissions.admin as unknown as Database['public']['Tables']['custom_roles']['Row']['permissions'],
     is_default: true,
     profile_id: null,
     created_at: '2024-01-01T00:00:00Z',
@@ -28,17 +28,7 @@ const defaultRoles: CustomRoleRow[] = [
     description: 'Profissional de saúde',
     icon: '👨‍⚕️',
     color: '#10b981',
-    permissions: {
-      viewAppointments: true, createAppointments: true, editAppointments: true,
-      cancelAppointments: true, confirmAppointments: true,
-      viewPatients: true, createPatients: true, editPatients: true,
-      deletePatients: false, viewSensitiveData: true,
-      viewReminders: true, manageReminders: true, viewMessages: true, sendMessages: true,
-      viewTeam: true, addTeamMembers: false, removeTeamMembers: false, manageRoles: false,
-      viewSettings: true, editSettings: false, manageIntegrations: false,
-      viewDashboard: true, viewReports: true, exportData: true,
-      viewNotifications: true, manageNotifications: true,
-    } as unknown as Database['public']['Tables']['custom_roles']['Row']['permissions'],
+    permissions: defaultRolePermissions.dentist as unknown as Database['public']['Tables']['custom_roles']['Row']['permissions'],
     is_default: true,
     profile_id: null,
     created_at: '2024-01-01T00:00:00Z',
@@ -49,17 +39,7 @@ const defaultRoles: CustomRoleRow[] = [
     description: 'Atendimento e agendamentos',
     icon: '📋',
     color: '#f59e0b',
-    permissions: {
-      viewAppointments: true, createAppointments: true, editAppointments: true,
-      cancelAppointments: false, confirmAppointments: true,
-      viewPatients: true, createPatients: true, editPatients: true,
-      deletePatients: false, viewSensitiveData: false,
-      viewReminders: true, manageReminders: false, viewMessages: true, sendMessages: true,
-      viewTeam: true, addTeamMembers: false, removeTeamMembers: false, manageRoles: false,
-      viewSettings: false, editSettings: false, manageIntegrations: false,
-      viewDashboard: true, viewReports: false, exportData: false,
-      viewNotifications: true, manageNotifications: true,
-    } as unknown as Database['public']['Tables']['custom_roles']['Row']['permissions'],
+    permissions: defaultRolePermissions.receptionist as unknown as Database['public']['Tables']['custom_roles']['Row']['permissions'],
     is_default: true,
     profile_id: null,
     created_at: '2024-01-01T00:00:00Z',
