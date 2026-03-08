@@ -13,7 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import type { RolePermissions } from '@/types';
-import { permissionCategories, defaultPermissions } from '@/types';
+import { permissionCategories, defaultPermissions, basePermissionKeys } from '@/types';
 import { Shield, Search, Settings2, Check } from 'lucide-react';
 
 interface PermissionsDialogProps {
@@ -22,6 +22,9 @@ interface PermissionsDialogProps {
   permissions: RolePermissions;
   onSave: (permissions: RolePermissions) => void;
 }
+
+// All permission keys that appear in the UI (excludes base permissions)
+const configurableKeys = permissionCategories.flatMap(cat => cat.permissions.map(p => p.key));
 
 export function PermissionsDialog({
   open,
@@ -41,8 +44,9 @@ export function PermissionsDialog({
     onOpenChange(isOpen);
   };
 
-  const totalEnabled = Object.values(localPermissions).filter(Boolean).length;
-  const totalPermissions = Object.keys(localPermissions).length;
+  // Count only configurable permissions (not base ones)
+  const totalEnabled = configurableKeys.filter(k => localPermissions[k]).length;
+  const totalPermissions = configurableKeys.length;
 
   const filteredCategories = useMemo(() => {
     if (!searchQuery.trim()) return permissionCategories;
@@ -77,16 +81,23 @@ export function PermissionsDialog({
   };
 
   const handleSelectAll = () => {
-    setLocalPermissions(
-      Object.keys(defaultPermissions).reduce(
-        (acc, key) => ({ ...acc, [key]: true }),
-        {} as RolePermissions
-      )
-    );
+    setLocalPermissions((prev) => {
+      const next = { ...prev };
+      for (const key of configurableKeys) {
+        next[key] = true;
+      }
+      return next;
+    });
   };
 
   const handleClearAll = () => {
-    setLocalPermissions({ ...defaultPermissions });
+    setLocalPermissions((prev) => {
+      const next = { ...prev };
+      for (const key of configurableKeys) {
+        next[key] = false;
+      }
+      return next;
+    });
   };
 
   const handleSave = () => {
