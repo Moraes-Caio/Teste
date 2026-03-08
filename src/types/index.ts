@@ -109,6 +109,7 @@ export interface RolePermissions {
   addTeamMembers: boolean;
   removeTeamMembers: boolean;
   manageRoles: boolean;
+  manageProcedures: boolean;
   
   // Configurações do Sistema
   viewSettings: boolean;
@@ -125,6 +126,54 @@ export interface RolePermissions {
   manageNotifications: boolean;
 }
 
+// Permissions that are ALWAYS enabled for every active member.
+// These are not shown in the permissions UI and cannot be disabled.
+export const basePermissionKeys: (keyof RolePermissions)[] = [
+  'viewDashboard',
+  'viewNotifications',
+  'manageNotifications',
+];
+
+// ============= DEFAULT ROLE PERMISSIONS (shared source of truth) =============
+
+export const defaultRolePermissions: Record<string, RolePermissions> = {
+  admin: {
+    viewAppointments: true, createAppointments: true, editAppointments: true,
+    cancelAppointments: true, confirmAppointments: true,
+    viewPatients: true, createPatients: true, editPatients: true,
+    deletePatients: true, viewSensitiveData: true,
+    viewReminders: true, manageReminders: true, viewMessages: true, sendMessages: true,
+    viewTeam: true, addTeamMembers: true, removeTeamMembers: true, manageRoles: true, manageProcedures: true,
+    viewSettings: true, editSettings: true, manageIntegrations: true,
+    viewDashboard: true, viewReports: true, exportData: true,
+    viewNotifications: true, manageNotifications: true,
+  },
+  dentist: {
+    viewAppointments: true, createAppointments: true, editAppointments: true,
+    cancelAppointments: true, confirmAppointments: true,
+    viewPatients: true, createPatients: true, editPatients: true,
+    deletePatients: false, viewSensitiveData: true,
+    viewReminders: true, manageReminders: true, viewMessages: true, sendMessages: true,
+    viewTeam: true, addTeamMembers: false, removeTeamMembers: false, manageRoles: false, manageProcedures: false,
+    viewSettings: true, editSettings: false, manageIntegrations: false,
+    viewDashboard: true, viewReports: true, exportData: true,
+    viewNotifications: true, manageNotifications: true,
+  },
+  receptionist: {
+    viewAppointments: true, createAppointments: true, editAppointments: true,
+    cancelAppointments: false, confirmAppointments: true,
+    viewPatients: true, createPatients: true, editPatients: true,
+    deletePatients: false, viewSensitiveData: false,
+    viewReminders: true, manageReminders: false, viewMessages: true, sendMessages: true,
+    viewTeam: true, addTeamMembers: false, removeTeamMembers: false, manageRoles: false, manageProcedures: false,
+    viewSettings: false, editSettings: false, manageIntegrations: false,
+    viewDashboard: true, viewReports: false, exportData: false,
+    viewNotifications: true, manageNotifications: true,
+  },
+};
+
+// ============= PERMISSION CATEGORIES (for the UI) =============
+
 export interface PermissionCategory {
   id: string;
   label: string;
@@ -136,6 +185,8 @@ export interface PermissionCategory {
   }[];
 }
 
+// NOTE: basePermissionKeys (viewDashboard, viewNotifications, manageNotifications)
+// are excluded from these categories so they don't appear in the permissions UI.
 export const permissionCategories: PermissionCategory[] = [
   {
     id: 'appointments',
@@ -181,6 +232,7 @@ export const permissionCategories: PermissionCategory[] = [
       { key: 'addTeamMembers', label: 'Adicionar e Editar Membros', description: 'Convidar novos membros e editar membros existentes' },
       { key: 'removeTeamMembers', label: 'Remover membros', description: 'Excluir membros da equipe' },
       { key: 'manageRoles', label: 'Gerenciar funções', description: 'Criar e editar funções' },
+      { key: 'manageProcedures', label: 'Gerenciar procedimentos', description: 'Criar e editar procedimentos' },
     ],
   },
   {
@@ -195,21 +247,11 @@ export const permissionCategories: PermissionCategory[] = [
   },
   {
     id: 'reports',
-    label: 'Dashboard e Relatórios',
+    label: 'Relatórios',
     icon: '📈',
     permissions: [
-      { key: 'viewDashboard', label: 'Visualizar dashboard', description: 'Acessar painel principal' },
       { key: 'viewReports', label: 'Visualizar relatórios', description: 'Ver relatórios e análises' },
       { key: 'exportData', label: 'Exportar dados', description: 'Baixar relatórios e dados' },
-    ],
-  },
-  {
-    id: 'notifications',
-    label: 'Notificações',
-    icon: '🔔',
-    permissions: [
-      { key: 'viewNotifications', label: 'Visualizar notificações', description: 'Ver notificações do sistema' },
-      { key: 'manageNotifications', label: 'Gerenciar notificações', description: 'Marcar como lida, arquivar, etc.' },
     ],
   },
 ];
@@ -233,6 +275,7 @@ export const defaultPermissions: RolePermissions = {
   addTeamMembers: false,
   removeTeamMembers: false,
   manageRoles: false,
+  manageProcedures: false,
   viewSettings: false,
   editSettings: false,
   manageIntegrations: false,
@@ -262,6 +305,7 @@ export const allPermissionsEnabled: RolePermissions = {
   addTeamMembers: true,
   removeTeamMembers: true,
   manageRoles: true,
+  manageProcedures: true,
   viewSettings: true,
   editSettings: true,
   manageIntegrations: true,
@@ -271,6 +315,26 @@ export const allPermissionsEnabled: RolePermissions = {
   viewNotifications: true,
   manageNotifications: true,
 };
+
+// Helper: applies base permissions (always ON) on top of any permissions object
+export function applyBasePermissions(permissions: RolePermissions): RolePermissions {
+  const result = { ...permissions };
+  for (const key of basePermissionKeys) {
+    result[key] = true;
+  }
+  return result;
+}
+
+// Helper: merges multiple permission sets with OR logic (for multi-role)
+export function mergePermissions(...permSets: RolePermissions[]): RolePermissions {
+  const result = { ...defaultPermissions };
+  for (const perms of permSets) {
+    for (const key of Object.keys(result) as (keyof RolePermissions)[]) {
+      if (perms[key]) result[key] = true;
+    }
+  }
+  return result;
+}
 
 export interface Role {
   id: string;
