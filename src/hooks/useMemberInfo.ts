@@ -1,7 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { type RolePermissions, defaultPermissions } from '@/types';
+import {
+  type RolePermissions,
+  defaultPermissions,
+  defaultRolePermissions,
+  basePermissionKeys,
+  applyBasePermissions,
+  mergePermissions,
+} from '@/types';
 
 export interface MemberInfo {
   id: string;
@@ -24,6 +31,20 @@ export interface RoleInfo {
   color: string | null;
   icon: string | null;
 }
+
+// Default role display names
+const defaultRoleNames: Record<string, string> = {
+  admin: 'Administrador',
+  dentist: 'Dentista',
+  receptionist: 'Recepcionista',
+};
+
+// Default role visual info
+const defaultRoleVisuals: Record<string, { color: string; icon: string }> = {
+  admin: { color: '#3b82f6', icon: '👨‍💼' },
+  dentist: { color: '#10b981', icon: '👨‍⚕️' },
+  receptionist: { color: '#f59e0b', icon: '📋' },
+};
 
 export function useMemberInfo() {
   const { user } = useAuth();
@@ -71,64 +92,79 @@ export function useMemberInfo() {
     enabled: !!user?.id,
   });
 
+  // Resolve permissions for all roles (supports comma-separated multi-role)
+  const roleIds = memberQuery.data?.roleId
+    ? memberQuery.data.roleId.split(',').map(s => s.trim()).filter(Boolean)
+    : [];
+
   const roleQuery = useQuery({
-    queryKey: ['member_role', memberQuery.data?.roleId],
-    queryFn: async (): Promise<RoleInfo | null> => {
-      const roleId = memberQuery.data?.roleId;
-      if (!roleId) return null;
-
-      // If it's a default role name (not UUID), skip the DB query
-      const defaultRoleNames: Record<string, string> = {
-        admin: 'Administrador',
-        dentist: 'Dentista',
-        receptionist: 'Recepcionista',
-      };
-
-      if (defaultRoleNames[roleId]) {
-        return {
-          id: roleId,
-          name: defaultRoleNames[roleId],
-          permissions: { ...defaultPermissions },
-          color: null,
-          icon: null,
-        };
+    queryKey: ['member_roles', roleIds.join(',')],
+    queryFn: async (): Promise<{ roles: RoleInfo[]; merged: RolePermissions }> => {
+      if (roleIds.length === 0) {
+        return { roles: [], merged: applyBasePermissions({ ...defaultPermissions }) };
       }
 
-      // It's a UUID (custom role) — query the DB
-      const { data } = await supabase
-        .from('custom_roles')
-        .select('id, name, permissions, color, icon')
-        .eq('id', roleId)
-        .maybeSingle();
+      const resolvedRoles: RoleInfo[] = [];
+      const customRoleIds: string[] = [];
 
-      if (data) {
-        return {
-          id: data.id,
-          name: data.name,
-          permissions: data.permissions as unknown as RolePermissions,
-          color: data.color,
-          icon: data.icon,
-        };
+      // Separate default roles from custom (UUID) roles
+      for (const rid of roleIds) {
+        if (defaultRoleNames[rid]) {
+          resolvedRoles.push({
+            id: rid,
+            name: defaultRoleNames[rid],
+            permissions: defaultRolePermissions[rid],
+            color: defaultRoleVisuals[rid]?.color ?? null,
+            icon: defaultRoleVisuals[rid]?.icon ?? null,
+          });
+        } else {
+          customRoleIds.push(rid);
+        }
       }
 
-      return {
-        id: roleId,
-        name: roleId,
-        permissions: { ...defaultPermissions },
-        color: null,
-        icon: null,
-      };
+      // Fetch custom roles from DB in a single query
+      if (customRoleIds.length > 0) {
+        const { data } = await supabase
+          .from('custom_roles')
+          .select('id, name, permissions, color, icon')
+          .in('id', customRoleIds);
+
+        if (data) {
+          for (const row of data) {
+            resolvedRoles.push({
+              id: row.id,
+              name: row.name,
+              permissions: row.permissions as unknown as RolePermissions,
+              color: row.color,
+              icon: row.icon,
+            });
+          }
+        }
+      }
+
+      // Merge all role permissions with OR logic, then apply base permissions
+      const merged = applyBasePermissions(
+        mergePermissions(...resolvedRoles.map(r => r.permissions))
+      );
+
+      return { roles: resolvedRoles, merged };
     },
-    enabled: !!memberQuery.data?.roleId,
+    enabled: roleIds.length > 0,
   });
 
   const member = memberQuery.data;
-  const role = roleQuery.data;
   const isOwner = member?.isOwner ?? false;
+  const resolvedRoles = roleQuery.data?.roles ?? [];
+  const mergedPermissions = roleQuery.data?.merged ?? applyBasePermissions({ ...defaultPermissions });
+
+  // Use the first role for display purposes (name, color, icon)
+  const primaryRole: RoleInfo | null = resolvedRoles.length > 0 ? resolvedRoles[0] : null;
 
   const hasPermission = (key: keyof RolePermissions): boolean => {
     if (isOwner) return true;
-    return role?.permissions?.[key] ?? false;
+    // Base permissions are always true
+    if ((basePermissionKeys as string[]).includes(key)) return true;
+    return mergedPermissions[key] ?? false;
   };
 
   const permissions: RolePermissions = isOwner
@@ -136,16 +172,16 @@ export function useMemberInfo() {
         acc[key as keyof RolePermissions] = true;
         return acc;
       }, { ...defaultPermissions })
-    : (role?.permissions ?? { ...defaultPermissions });
+    : mergedPermissions;
 
   return {
     member,
-    role,
+    role: primaryRole,
     isOwner,
     hasPermission,
     permissions,
     profileId: member?.profileId ?? null,
-    isLoading: memberQuery.isLoading || (!!member?.roleId && roleQuery.isLoading),
+    isLoading: memberQuery.isLoading || (roleIds.length > 0 && roleQuery.isLoading),
     refetch: memberQuery.refetch,
   };
 }
