@@ -258,11 +258,9 @@ export function ProfessionalDatePicker({
           avoidCollisions={false}
           className={cn(
             "w-auto p-0 pointer-events-auto bg-popover rounded-lg border shadow-2xl overflow-visible",
-            // AC: Centered, fixed-position modal overriding Radix positioning
             "!fixed !top-1/2 !left-1/2 ![transform:translate(-50%,-50%)]"
           )}
           style={{
-            // AC: constrained to max-width and max-height and strict z-index
             maxWidth: '90vw',
             maxHeight: '90vh',
             zIndex: 9999,
