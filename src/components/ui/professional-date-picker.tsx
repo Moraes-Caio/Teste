@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { ChevronLeft, ChevronRight, CalendarIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarIcon, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,13 +8,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   format,
@@ -81,6 +74,9 @@ export function ProfessionalDatePicker({
 
   const [typedValue, setTypedValue] = useState("");
   const [typingError, setTypingError] = useState("");
+
+  const [isMonthOpen, setIsMonthOpen] = useState(false);
+  const [isYearOpen, setIsYearOpen] = useState(false);
 
   const today = startOfDay(new Date());
   const currentYear = getYear(new Date());
@@ -174,11 +170,12 @@ export function ProfessionalDatePicker({
     if (value) setCurrentMonth(value);
   }, [value]);
 
-  // Clear typing state when popover closes
   useEffect(() => {
     if (!open) {
       setTypedValue("");
       setTypingError("");
+      setIsMonthOpen(false);
+      setIsYearOpen(false);
     }
   }, [open]);
 
@@ -196,7 +193,6 @@ export function ProfessionalDatePicker({
     return isBefore(maxDate, startOfMonth(nextMonth));
   }, [currentMonth, maxDate]);
 
-  // Input change handler with DD/MM/AAAA mask
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const raw = e.target.value.replace(/\D/g, "");
     let formatted = "";
@@ -205,7 +201,6 @@ export function ProfessionalDatePicker({
     if (raw.length >= 5) formatted += "/" + raw.slice(4, 8);
     setTypedValue(formatted);
 
-    // Navigate calendar as user types month/year
     if (raw.length >= 4) {
       const month = parseInt(raw.slice(2, 4), 10);
       const year = raw.length >= 6 ? parseInt(raw.slice(4, Math.min(raw.length, 8)), 10) : getYear(currentMonth);
@@ -214,7 +209,6 @@ export function ProfessionalDatePicker({
       }
     }
 
-    // Validate on complete
     if (formatted.length === 10) {
       const parsed = parse(formatted, "dd/MM/yyyy", new Date());
       if (!isValid(parsed)) { setTypingError("Data inválida"); return; }
@@ -261,19 +255,24 @@ export function ProfessionalDatePicker({
           </Button>
         </PopoverTrigger>
         <PopoverContent
-          className="w-auto p-0 pointer-events-auto z-[9999]"
-          align="start"
-          sideOffset={4}
-          collisionPadding={20}
-          avoidCollisions={true}
+          className="w-auto p-0 pointer-events-auto bg-popover rounded-lg border shadow-2xl"
+          style={{
+            position: 'fixed',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 9999,
+            maxWidth: '90vw',
+            maxHeight: '90vh',
+            overflow: 'visible'
+          }}
           onOpenAutoFocus={(e) => {
             e.preventDefault();
             setTimeout(() => inputRef.current?.focus(), 0);
           }}
           onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}
         >
-          {/* Always visible typing input */}
-          <div className="px-4 pt-3 pb-1">
+          <div className="px-4 pt-3 pb-1 relative" style={{ zIndex: 10000 }}>
             <input
               ref={inputRef}
               type="text"
@@ -291,26 +290,104 @@ export function ProfessionalDatePicker({
             {typingError && <p className="text-xs text-destructive mt-1">{typingError}</p>}
           </div>
 
-          <div
-            ref={containerRef}
-            className="bg-popover rounded-lg border-0 shadow-lg"
-            style={{ minWidth: "320px" }}
-          >
+          <div ref={containerRef} className="relative" style={{ minWidth: "320px" }}>
+            {(isMonthOpen || isYearOpen) && (
+              <div
+                className="fixed inset-0 bg-transparent"
+                style={{ zIndex: 9999 }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsMonthOpen(false);
+                  setIsYearOpen(false);
+                }}
+              />
+            )}
+
             {/* Header */}
-            <div className="flex items-center justify-between gap-2 p-4 pb-2 border-b border-border">
+            <div className="relative flex items-center justify-between gap-2 p-4 pb-2 border-b border-border" style={{ zIndex: 10000 }}>
               <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={handlePrevMonth} disabled={isPrevDisabled}>
                 <ChevronLeft className="h-4 w-4" />
               </Button>
+              
               <div className="flex items-center gap-2">
-                <Select value={getMonth(currentMonth).toString()} onValueChange={handleMonthChange}>
-                  <SelectTrigger className="h-8 w-[120px] border-0 bg-muted/50 focus:ring-0 font-medium"><SelectValue /></SelectTrigger>
-                  <SelectContent><ScrollArea className="h-[200px]">{availableMonths.map(({ name, index }) => (<SelectItem key={index} value={index.toString()}>{name}</SelectItem>))}</ScrollArea></SelectContent>
-                </Select>
-                <Select value={getYear(currentMonth).toString()} onValueChange={handleYearChange}>
-                  <SelectTrigger className="h-8 w-[90px] border-0 bg-muted/50 focus:ring-0 font-medium"><SelectValue /></SelectTrigger>
-                  <SelectContent><ScrollArea className="h-[200px]">{years.map((year) => (<SelectItem key={year} value={year.toString()}>{year}</SelectItem>))}</ScrollArea></SelectContent>
-                </Select>
+                {/* Month Selector */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    className="flex h-8 w-[120px] items-center justify-between rounded-md border border-input bg-muted/50 px-3 py-2 text-sm focus:outline-none hover:bg-muted font-medium"
+                    onClick={() => { setIsMonthOpen(!isMonthOpen); setIsYearOpen(false); }}
+                  >
+                    {availableMonths.find(m => m.index === getMonth(currentMonth))?.name || "Mês"}
+                    <ChevronDown className="h-4 w-4 opacity-50" />
+                  </button>
+                  {isMonthOpen && (
+                    <div
+                      className="absolute top-full left-0 mt-1 w-[120px] rounded-md border bg-popover text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95"
+                      style={{ zIndex: 10000 }}
+                    >
+                      <ScrollArea className="h-[200px]">
+                        <div className="p-1">
+                          {availableMonths.map(({ name, index }) => (
+                            <div
+                              key={index}
+                              className={cn(
+                                "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                                index === getMonth(currentMonth) && "bg-accent text-accent-foreground font-medium"
+                              )}
+                              onClick={() => {
+                                handleMonthChange(index.toString());
+                                setIsMonthOpen(false);
+                              }}
+                            >
+                              {name}
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  )}
+                </div>
+
+                {/* Year Selector */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    className="flex h-8 w-[90px] items-center justify-between rounded-md border border-input bg-muted/50 px-3 py-2 text-sm focus:outline-none hover:bg-muted font-medium"
+                    onClick={() => { setIsYearOpen(!isYearOpen); setIsMonthOpen(false); }}
+                  >
+                    {getYear(currentMonth)}
+                    <ChevronDown className="h-4 w-4 opacity-50" />
+                  </button>
+                  {isYearOpen && (
+                    <div
+                      className="absolute top-full left-0 mt-1 w-[90px] rounded-md border bg-popover text-popover-foreground shadow-md outline-none animate-in fade-in-0 zoom-in-95"
+                      style={{ zIndex: 10000 }}
+                    >
+                      <ScrollArea className="h-[200px]">
+                        <div className="p-1">
+                          {years.map((year) => (
+                            <div
+                              key={year}
+                              className={cn(
+                                "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 text-sm outline-none hover:bg-accent hover:text-accent-foreground",
+                                year === getYear(currentMonth) && "bg-accent text-accent-foreground font-medium"
+                              )}
+                              onClick={() => {
+                                handleYearChange(year.toString());
+                                setIsYearOpen(false);
+                              }}
+                            >
+                              {year}
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                  )}
+                </div>
               </div>
+
               <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={handleNextMonth} disabled={isNextDisabled}>
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -380,7 +457,6 @@ export function ProfessionalDatePicker({
   );
 }
 
-// Export a simpler version for forms
 export function DatePickerField({
   value, onChange, label, required, error, ...props
 }: ProfessionalDatePickerProps & { label?: string; required?: boolean; error?: string }) {

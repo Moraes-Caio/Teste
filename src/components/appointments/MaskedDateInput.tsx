@@ -39,7 +39,6 @@ export function MaskedDateInput({
   const inputRef = useRef<HTMLInputElement>(null);
   const [calendarMonth, setCalendarMonth] = useState<Date>(value || new Date());
 
-  // Sync input value from prop
   useEffect(() => {
     if (value && isValid(value)) {
       const d = String(value.getDate()).padStart(2, "0");
@@ -94,7 +93,6 @@ export function MaskedDateInput({
 
     setInputValue(formatted);
 
-    // Update calendar month as user types
     if (raw.length >= 4) {
       const month = parseInt(raw.slice(2, 4), 10);
       const year = raw.length >= 6 ? parseInt(raw.slice(4, Math.min(raw.length, 8)), 10) : new Date().getFullYear();
@@ -111,9 +109,7 @@ export function MaskedDateInput({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    // Allow navigation keys
     if (["Backspace", "Delete", "ArrowLeft", "ArrowRight", "Tab"].includes(e.key)) return;
-    // Only allow digits
     if (!/^\d$/.test(e.key)) {
       e.preventDefault();
     }
@@ -159,7 +155,19 @@ export function MaskedDateInput({
               <CalendarIcon className="h-4 w-4" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0 pointer-events-auto" align="end">
+          <PopoverContent 
+            className="w-auto p-0 pointer-events-auto bg-popover rounded-lg border shadow-2xl" 
+            style={{
+              position: 'fixed',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              zIndex: 9999,
+              maxWidth: '90vw',
+              maxHeight: '90vh',
+              overflow: 'visible'
+            }}
+          >
             <Calendar
               mode="single"
               selected={value}
