@@ -116,13 +116,22 @@ export default function Team() {
   const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   const handleSubmit = async () => {
-    if (!formData.fullName || !formData.email || formData.roleIds.length === 0) {
-      toast({ title: 'Erro', description: 'Preencha todos os campos obrigatórios.', variant: 'destructive' });
-      return;
-    }
-    if (!isValidEmail(formData.email)) {
-      toast({ title: 'Erro', description: 'Insira um email válido.', variant: 'destructive' });
-      return;
+    if (selectedMember) {
+      // Editing existing member: only validate role
+      if (formData.roleIds.length === 0) {
+        toast({ title: 'Erro', description: 'Selecione pelo menos uma função.', variant: 'destructive' });
+        return;
+      }
+    } else {
+      // Adding new member: validate all fields
+      if (!formData.fullName || !formData.email || formData.roleIds.length === 0) {
+        toast({ title: 'Erro', description: 'Preencha todos os campos obrigatórios.', variant: 'destructive' });
+        return;
+      }
+      if (!isValidEmail(formData.email)) {
+        toast({ title: 'Erro', description: 'Insira um email válido.', variant: 'destructive' });
+        return;
+      }
     }
 
     try {
@@ -137,11 +146,6 @@ export default function Team() {
         } else if (roleChanged && !actions.canChangeRole) {
           toast({ title: 'Erro', description: actions.reason || 'Você não tem permissão para alterar esta função.', variant: 'destructive' });
           return;
-        }
-
-        // Update specialty if it changed (only allowed for own record or via separate logic)
-        if (formData.specialty !== (selectedMember.specialty || '')) {
-          await updateTeamMember({ id: selectedMember.id, specialty: formData.specialty || null });
         }
 
         toast({ title: 'Sucesso', description: 'Membro atualizado com sucesso!' });
