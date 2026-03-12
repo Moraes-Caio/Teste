@@ -173,7 +173,10 @@ export function RoleManagementDialog({ open, onOpenChange }: RoleManagementDialo
 
   const handlePermissionsSave = (permissions: RolePermissions) => { setFormData((prev) => ({ ...prev, permissions })); };
   const getMembersCount = (roleId: string) => teamMembers.filter((m) => m.role_id === roleId).length;
-  const getPermissionCount = (role: Role) => Object.values(role.permissions).filter(Boolean).length;
+  const getPermissionCount = (role: Role) => {
+    const configurableKeys = permissionCategories.flatMap(cat => cat.permissions.map(p => p.key));
+    return configurableKeys.filter(k => role.permissions[k]).length;
+  };
   const getMainPermissions = (role: Role) => {
     const allPerms: string[] = [];
     permissionCategories.forEach(cat => cat.permissions.forEach(p => { if (role.permissions[p.key]) allPerms.push(p.label); }));
@@ -336,8 +339,9 @@ export function RoleManagementDialog({ open, onOpenChange }: RoleManagementDialo
                   </div>
 
                   {(() => {
-                    const totalEnabled = Object.values(formData.permissions).filter(Boolean).length;
-                    const totalPermissions = Object.keys(formData.permissions).length;
+                    const configurableKeys = permissionCategories.flatMap(cat => cat.permissions.map(p => p.key));
+                    const totalEnabled = configurableKeys.filter(k => formData.permissions[k]).length;
+                    const totalPermissions = configurableKeys.length;
                     const categoryPreviews = permissionCategories.map(cat => ({ icon: cat.icon, label: cat.label, enabled: cat.permissions.filter(p => formData.permissions[p.key]).length, total: cat.permissions.length })).filter(c => c.enabled > 0);
                     return (
                       <div className="space-y-3">
