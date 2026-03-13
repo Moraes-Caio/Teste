@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTeamMembers, getMemberActions, type TeamMemberRow } from '@/hooks/useTeamMembers';
+import { useTeamMembers, getMemberActions, findAdminRole, type TeamMemberRow } from '@/hooks/useTeamMembers';
 import { useProfile } from '@/hooks/useProfile';
 import { useInvitations } from '@/hooks/useInvitations';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -47,7 +47,7 @@ export default function Team() {
 
   // Invite dialog state
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
-  const [inviteForm, setInviteForm] = useState({ email: '', roleId: 'receptionist' });
+  const [inviteForm, setInviteForm] = useState({ email: '', roleId: '' });
 
   // Procedures inline state
   const [isProcDialogOpen, setIsProcDialogOpen] = useState(false);
@@ -136,7 +136,7 @@ export default function Team() {
 
     try {
       if (selectedMember) {
-        const actions = getMemberActions(currentMember, selectedMember);
+        const actions = getMemberActions(currentMember, selectedMember, roles);
         const newRoleId = formData.roleIds.join(', ');
         const roleChanged = newRoleId !== selectedMember.role_id;
 
@@ -201,7 +201,7 @@ export default function Team() {
       });
       toast({ title: 'Convite enviado!', description: `Convite enviado para ${inviteForm.email}` });
       setIsInviteDialogOpen(false);
-      setInviteForm({ email: '', roleId: 'receptionist' });
+      setInviteForm({ email: '', roleId: roles[0]?.id || '' });
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' });
     }
@@ -228,10 +228,11 @@ export default function Team() {
   const getRoleById = (roleId: string) => roles.find((r) => r.id === roleId);
 
   const getRoleBadgeColor = (roleId: string) => {
-    if (roleId === 'admin') return 'bg-primary/10 text-primary border-primary/20';
-    if (roleId === 'dentist') return 'bg-secondary/10 text-secondary border-secondary/20';
-    if (roleId === 'receptionist') return 'bg-info/10 text-info border-info/20';
-    return 'bg-warning/10 text-warning border-warning/20';
+    const role = roles.find(r => r.id === roleId);
+    if (role?.color) {
+      return `border-[${role.color}]/20 text-foreground`;
+    }
+    return 'bg-muted/50 text-muted-foreground border-border';
   };
 
   const getRoleLabels = (member: TeamMemberRow) => {
@@ -569,7 +570,7 @@ export default function Team() {
         <DialogContent className="max-w-lg flex flex-col">
           <DialogHeader className="shrink-0"><DialogTitle>{selectedMember ? 'Detalhes do Membro' : 'Adicionar Membro'}</DialogTitle><DialogDescription>{selectedMember ? 'Visualize e gerencie as informações do membro' : 'Adicione um membro diretamente à equipe'}</DialogDescription></DialogHeader>
           {(() => {
-            const actions = selectedMember ? getMemberActions(currentMember, selectedMember) : null;
+            const actions = selectedMember ? getMemberActions(currentMember, selectedMember, roles) : null;
             const isSelf = selectedMember && currentMember && selectedMember.id === currentMember.id;
             const isEditingExisting = !!selectedMember;
 
