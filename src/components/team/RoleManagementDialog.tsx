@@ -233,7 +233,7 @@ export function RoleManagementDialog({ open, onOpenChange }: RoleManagementDialo
                               <div className="flex gap-1.5 shrink-0">
                                 <Button variant="outline" size="sm" onClick={() => handleDuplicateRole(role)} title="Duplicar função"><Copy className="h-3.5 w-3.5" /></Button>
                                 {/* Admin role: only owner can edit, never deletable */}
-                                {role.id === 'admin' ? (
+                                {(role.is_default && role.name === 'Administrador') ? (
                                   isOwner && <Button variant="outline" size="sm" onClick={() => handleOpenForm(role)}><Pencil className="h-3.5 w-3.5 mr-1" />Editar</Button>
                                 ) : (
                                   <>
