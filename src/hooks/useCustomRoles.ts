@@ -68,9 +68,6 @@ export function useCustomRoles() {
 
   const deleteRole = useMutation({
     mutationFn: async (id: string) => {
-      // Default roles cannot be deleted — check by is_default flag
-      const role = (query.data || []).find(r => r.id === id);
-      if (role?.is_default) return;
       const { error } = await supabase
         .from('custom_roles')
         .delete()
