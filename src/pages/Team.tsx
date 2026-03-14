@@ -24,10 +24,12 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 import { Plus, UsersRound, Trash2, Mail, Stethoscope, Crown, Settings, Loader2, Shield, Send, Clock, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import { RoleManagementDialog } from '@/components/team/RoleManagementDialog';
 import { useProcedures } from '@/hooks/useProcedures';
 import { type RolePermissions, defaultPermissions } from '@/types';
+import { useMemberInfo } from '@/hooks/useMemberInfo';
 
 export default function Team() {
   const { user } = useAuth();
@@ -266,6 +268,10 @@ export default function Team() {
 
   const currentPermissions = getMergedPermissions(currentMember);
   const canAddEditMembers = isOwner || (currentPermissions.addTeamMembers ?? false);
+  const { hasPermission: memberHasPermission } = useMemberInfo();
+  const canManageRoles = isOwner || (memberHasPermission('manageRoles'));
+  const canManageProcedures = isOwner || (memberHasPermission('manageProcedures'));
+  const canRemoveMembers = isOwner || (memberHasPermission('removeTeamMembers'));
 
   const getProfessionalNames = (ids?: string[] | null) => {
     if (!ids || ids.length === 0) return 'Todos os profissionais';
@@ -326,7 +332,7 @@ export default function Team() {
           <TabsContent value="team" className="space-y-6 mt-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end">
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setIsRolesDialogOpen(true)} className="gap-2"><Settings className="h-4 w-4" />Gerenciar Funções</Button>
+                {canManageRoles && <Button variant="outline" onClick={() => setIsRolesDialogOpen(true)} className="gap-2"><Settings className="h-4 w-4" />Gerenciar Funções</Button>}
                 
               </div>
             </div>
@@ -356,11 +362,6 @@ export default function Team() {
                             {getRoleLabels(member).map((label, i) => (
                               <Badge key={i} variant="outline" className={getRoleBadgeColor(member.role_id.split(',')[i]?.trim() || '')}>{label}</Badge>
                             ))}
-                            {member.is_owner && (
-                              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-xs gap-1">
-                                <Shield className="h-3 w-3" />Todas permissões
-                              </Badge>
-                            )}
                           </div>
                           {member.specialty && (<p className="text-sm text-muted-foreground mt-2 flex items-center gap-1"><Stethoscope className="h-3.5 w-3.5" />{member.specialty}</p>)}
                           <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1 truncate"><Mail className="h-3.5 w-3.5 flex-shrink-0" />{member.email}</p>
@@ -434,7 +435,7 @@ export default function Team() {
           {/* ===== PROCEDIMENTOS TAB ===== */}
           <TabsContent value="procedures" className="space-y-6 mt-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end">
-              <Button onClick={() => { setEditingProc(null); setProcForm({ title: '', description: '', returnInterval: '', returnIntervalUnit: 'months', durationMinutes: '', selectedProfessionals: [] }); setIsProcDialogOpen(true); }} className="gap-2"><Plus className="h-4 w-4" />Novo Procedimento</Button>
+              {canManageProcedures && <Button onClick={() => { setEditingProc(null); setProcForm({ title: '', description: '', returnInterval: '', returnIntervalUnit: 'months', durationMinutes: '', selectedProfessionals: [] }); setIsProcDialogOpen(true); }} className="gap-2"><Plus className="h-4 w-4" />Novo Procedimento</Button>}
             </div>
 
             {proceduresLoading ? (
@@ -446,8 +447,9 @@ export default function Team() {
                 {procedures.map((proc) => (
                   <Card
                     key={proc.id}
-                    className="overflow-hidden transition-all hover:shadow-md cursor-pointer"
+                    className={cn("overflow-hidden transition-all", canManageProcedures && "hover:shadow-md cursor-pointer")}
                     onClick={() => {
+                      if (!canManageProcedures) return;
                       setEditingProc(proc);
                       const converted = proc.return_interval_days ? daysToUnit(proc.return_interval_days) : { value: '', unit: 'months' as const };
                       setProcForm({ title: proc.title, description: proc.description || '', returnInterval: converted.value.toString(), returnIntervalUnit: converted.unit, durationMinutes: proc.duration_minutes ? proc.duration_minutes.toString() : '', selectedProfessionals: proc.professional_ids || [] });
