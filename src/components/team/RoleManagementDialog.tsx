@@ -232,15 +232,11 @@ export function RoleManagementDialog({ open, onOpenChange }: RoleManagementDialo
                               </div>
                               <div className="flex gap-1.5 shrink-0">
                                 <Button variant="outline" size="sm" onClick={() => handleDuplicateRole(role)} title="Duplicar função"><Copy className="h-3.5 w-3.5" /></Button>
-                                {/* Admin role: only owner can edit */}
-                                {(role.is_default && role.name === 'Administrador') ? (
-                                  isOwner && (
-                                    <>
-                                      <Button variant="outline" size="sm" onClick={() => handleOpenForm(role)}><Pencil className="h-3.5 w-3.5 mr-1" />Editar</Button>
-                                      <Button variant="outline" size="sm" onClick={() => setRoleToDelete(role)} className="text-destructive hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
-                                    </>
-                                  )
+                                {role.name === 'Administrador' ? (
+                                  /* Admin: only owner can edit, NEVER deletable */
+                                  isOwner && <Button variant="outline" size="sm" onClick={() => handleOpenForm(role)}><Pencil className="h-3.5 w-3.5 mr-1" />Editar</Button>
                                 ) : (
+                                  /* All other roles: edit + delete */
                                   <>
                                     <Button variant="outline" size="sm" onClick={() => handleOpenForm(role)}><Pencil className="h-3.5 w-3.5 mr-1" />Editar</Button>
                                     <Button variant="outline" size="sm" onClick={() => setRoleToDelete(role)} className="text-destructive hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
@@ -263,7 +259,18 @@ export function RoleManagementDialog({ open, onOpenChange }: RoleManagementDialo
                   <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-4">
                     <div className="space-y-2"><Label>Ícone</Label><div className="flex flex-wrap gap-1.5 p-2 border border-border rounded-lg bg-muted/30 max-w-[180px]">{roleIcons.map((icon) => (<button key={icon} type="button" onClick={() => setFormData({ ...formData, icon })} className={cn('w-9 h-9 rounded-lg flex items-center justify-center text-lg transition-all', formData.icon === icon ? 'bg-primary text-primary-foreground shadow-sm' : 'hover:bg-muted')}>{icon}</button>))}</div></div>
                     <div className="space-y-4">
-                      <div className="space-y-2"><Label>Nome da Função *</Label><Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Ex: Enfermeiro, Auxiliar, Técnico" /></div>
+                      <div className="space-y-2">
+                        <Label>Nome da Função *</Label>
+                        <Input
+                          value={formData.name}
+                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                          placeholder="Ex: Enfermeiro, Auxiliar, Técnico"
+                          disabled={editingRole?.name === 'Administrador'}
+                        />
+                        {editingRole?.name === 'Administrador' && (
+                          <p className="text-xs text-muted-foreground">O nome da função Administrador não pode ser alterado.</p>
+                        )}
+                      </div>
                       <div className="space-y-2"><Label>Descrição (opcional)</Label><Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Breve descrição das responsabilidades desta função..." rows={2} /></div>
                     </div>
                   </div>
