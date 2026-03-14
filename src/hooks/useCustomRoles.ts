@@ -38,7 +38,12 @@ export function useCustomRoles() {
           is_default: false,
           profile_id: user!.id,
         });
-      if (error) throw error;
+      if (error) {
+        if (error.message?.includes('unique_role_name_per_workspace') || error.code === '23505') {
+          throw new Error('Já existe uma função com este nome.');
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['custom_roles'] });
@@ -48,6 +53,11 @@ export function useCustomRoles() {
 
   const updateRole = useMutation({
     mutationFn: async ({ id, ...updates }: { id: string; name?: string; description?: string; icon?: string; color?: string; permissions?: RolePermissions }) => {
+      // Admin role: block name change
+      const role = (query.data || []).find(r => r.id === id);
+      if (role?.name === 'Administrador' && updates.name && updates.name !== 'Administrador') {
+        throw new Error('O nome da função Administrador não pode ser alterado.');
+      }
       const dbUpdates: any = {};
       if (updates.name) dbUpdates.name = updates.name;
       if (updates.description !== undefined) dbUpdates.description = updates.description;
@@ -58,7 +68,12 @@ export function useCustomRoles() {
         .from('custom_roles')
         .update(dbUpdates)
         .eq('id', id);
-      if (error) throw error;
+      if (error) {
+        if (error.message?.includes('unique_role_name_per_workspace') || error.code === '23505') {
+          throw new Error('Já existe uma função com este nome.');
+        }
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['custom_roles'] });
@@ -68,6 +83,11 @@ export function useCustomRoles() {
 
   const deleteRole = useMutation({
     mutationFn: async (id: string) => {
+      // Administrador role cannot be deleted
+      const role = (query.data || []).find(r => r.id === id);
+      if (role?.name === 'Administrador') {
+        throw new Error('A função Administrador não pode ser excluída.');
+      }
       const { error } = await supabase
         .from('custom_roles')
         .delete()
