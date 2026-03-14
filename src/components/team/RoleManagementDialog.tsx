@@ -232,13 +232,18 @@ export function RoleManagementDialog({ open, onOpenChange }: RoleManagementDialo
                               </div>
                               <div className="flex gap-1.5 shrink-0">
                                 <Button variant="outline" size="sm" onClick={() => handleDuplicateRole(role)} title="Duplicar função"><Copy className="h-3.5 w-3.5" /></Button>
-                                {/* Admin role: only owner can edit, never deletable */}
-                                {role.id === 'admin' ? (
-                                  isOwner && <Button variant="outline" size="sm" onClick={() => handleOpenForm(role)}><Pencil className="h-3.5 w-3.5 mr-1" />Editar</Button>
+                                {/* Admin role: only owner can edit */}
+                                {(role.is_default && role.name === 'Administrador') ? (
+                                  isOwner && (
+                                    <>
+                                      <Button variant="outline" size="sm" onClick={() => handleOpenForm(role)}><Pencil className="h-3.5 w-3.5 mr-1" />Editar</Button>
+                                      <Button variant="outline" size="sm" onClick={() => setRoleToDelete(role)} className="text-destructive hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
+                                    </>
+                                  )
                                 ) : (
                                   <>
                                     <Button variant="outline" size="sm" onClick={() => handleOpenForm(role)}><Pencil className="h-3.5 w-3.5 mr-1" />Editar</Button>
-                                    {!role.isDefault && <Button variant="outline" size="sm" onClick={() => setRoleToDelete(role)} className="text-destructive hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>}
+                                    <Button variant="outline" size="sm" onClick={() => setRoleToDelete(role)} className="text-destructive hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></Button>
                                   </>
                                 )}
                               </div>

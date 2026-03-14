@@ -3,48 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Database } from '@/integrations/supabase/types';
 import type { RolePermissions } from '@/types';
-import { allPermissionsEnabled, defaultRolePermissions } from '@/types';
 
 type CustomRoleRow = Database['public']['Tables']['custom_roles']['Row'];
 
 export type { CustomRoleRow };
-
-// Default roles that are always available (not stored in DB)
-const defaultRoles: CustomRoleRow[] = [
-  {
-    id: 'admin',
-    name: 'Administrador',
-    description: 'Acesso completo ao sistema',
-    icon: '👨‍💼',
-    color: '#3b82f6',
-    permissions: defaultRolePermissions.admin as unknown as Database['public']['Tables']['custom_roles']['Row']['permissions'],
-    is_default: true,
-    profile_id: null,
-    created_at: '2024-01-01T00:00:00Z',
-  },
-  {
-    id: 'dentist',
-    name: 'Dentista',
-    description: 'Profissional de saúde',
-    icon: '👨‍⚕️',
-    color: '#10b981',
-    permissions: defaultRolePermissions.dentist as unknown as Database['public']['Tables']['custom_roles']['Row']['permissions'],
-    is_default: true,
-    profile_id: null,
-    created_at: '2024-01-01T00:00:00Z',
-  },
-  {
-    id: 'receptionist',
-    name: 'Recepcionista',
-    description: 'Atendimento e agendamentos',
-    icon: '📋',
-    color: '#f59e0b',
-    permissions: defaultRolePermissions.receptionist as unknown as Database['public']['Tables']['custom_roles']['Row']['permissions'],
-    is_default: true,
-    profile_id: null,
-    created_at: '2024-01-01T00:00:00Z',
-  },
-];
 
 export function useCustomRoles() {
   const { user } = useAuth();
@@ -58,8 +20,7 @@ export function useCustomRoles() {
         .select('*')
         .order('created_at');
       if (error) throw error;
-      // Merge default roles with custom ones from DB
-      return [...defaultRoles, ...(data || [])];
+      return data || [];
     },
     enabled: !!user?.id,
   });
@@ -79,13 +40,14 @@ export function useCustomRoles() {
         });
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['custom_roles'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['custom_roles'] });
+      queryClient.invalidateQueries({ queryKey: ['member_roles'] });
+    },
   });
 
   const updateRole = useMutation({
     mutationFn: async ({ id, ...updates }: { id: string; name?: string; description?: string; icon?: string; color?: string; permissions?: RolePermissions }) => {
-      // Don't update default roles in DB
-      if (['admin', 'dentist', 'receptionist'].includes(id)) return;
       const dbUpdates: any = {};
       if (updates.name) dbUpdates.name = updates.name;
       if (updates.description !== undefined) dbUpdates.description = updates.description;
@@ -98,23 +60,28 @@ export function useCustomRoles() {
         .eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['custom_roles'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['custom_roles'] });
+      queryClient.invalidateQueries({ queryKey: ['member_roles'] });
+    },
   });
 
   const deleteRole = useMutation({
     mutationFn: async (id: string) => {
-      if (['admin', 'dentist', 'receptionist'].includes(id)) return;
       const { error } = await supabase
         .from('custom_roles')
         .delete()
         .eq('id', id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['custom_roles'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['custom_roles'] });
+      queryClient.invalidateQueries({ queryKey: ['member_roles'] });
+    },
   });
 
   return {
-    roles: query.data || defaultRoles,
+    roles: query.data || [],
     isLoading: query.isLoading,
     error: query.error,
     addRole: addRole.mutateAsync,

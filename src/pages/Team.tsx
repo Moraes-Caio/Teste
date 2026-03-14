@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTeamMembers, getMemberActions, type TeamMemberRow } from '@/hooks/useTeamMembers';
+import { useTeamMembers, getMemberActions, findAdminRole, type TeamMemberRow } from '@/hooks/useTeamMembers';
 import { useProfile } from '@/hooks/useProfile';
 import { useInvitations } from '@/hooks/useInvitations';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -24,10 +24,12 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 import { Plus, UsersRound, Trash2, Mail, Stethoscope, Crown, Settings, Loader2, Shield, Send, Clock, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import { RoleManagementDialog } from '@/components/team/RoleManagementDialog';
 import { useProcedures } from '@/hooks/useProcedures';
 import { type RolePermissions, defaultPermissions } from '@/types';
+import { useMemberInfo } from '@/hooks/useMemberInfo';
 
 export default function Team() {
   const { user } = useAuth();
@@ -47,7 +49,7 @@ export default function Team() {
 
   // Invite dialog state
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
-  const [inviteForm, setInviteForm] = useState({ email: '', roleId: 'receptionist' });
+  const [inviteForm, setInviteForm] = useState({ email: '', roleId: '' });
 
   // Procedures inline state
   const [isProcDialogOpen, setIsProcDialogOpen] = useState(false);
@@ -136,7 +138,7 @@ export default function Team() {
 
     try {
       if (selectedMember) {
-        const actions = getMemberActions(currentMember, selectedMember);
+        const actions = getMemberActions(currentMember, selectedMember, roles);
         const newRoleId = formData.roleIds.join(', ');
         const roleChanged = newRoleId !== selectedMember.role_id;
 
@@ -201,7 +203,7 @@ export default function Team() {
       });
       toast({ title: 'Convite enviado!', description: `Convite enviado para ${inviteForm.email}` });
       setIsInviteDialogOpen(false);
-      setInviteForm({ email: '', roleId: 'receptionist' });
+      setInviteForm({ email: '', roleId: roles[0]?.id || '' });
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message, variant: 'destructive' });
     }
@@ -228,10 +230,11 @@ export default function Team() {
   const getRoleById = (roleId: string) => roles.find((r) => r.id === roleId);
 
   const getRoleBadgeColor = (roleId: string) => {
-    if (roleId === 'admin') return 'bg-primary/10 text-primary border-primary/20';
-    if (roleId === 'dentist') return 'bg-secondary/10 text-secondary border-secondary/20';
-    if (roleId === 'receptionist') return 'bg-info/10 text-info border-info/20';
-    return 'bg-warning/10 text-warning border-warning/20';
+    const role = roles.find(r => r.id === roleId);
+    if (role?.color) {
+      return `border-[${role.color}]/20 text-foreground`;
+    }
+    return 'bg-muted/50 text-muted-foreground border-border';
   };
 
   const getRoleLabels = (member: TeamMemberRow) => {
@@ -265,6 +268,10 @@ export default function Team() {
 
   const currentPermissions = getMergedPermissions(currentMember);
   const canAddEditMembers = isOwner || (currentPermissions.addTeamMembers ?? false);
+  const { hasPermission: memberHasPermission } = useMemberInfo();
+  const canManageRoles = isOwner || (memberHasPermission('manageRoles'));
+  const canManageProcedures = isOwner || (memberHasPermission('manageProcedures'));
+  const canRemoveMembers = isOwner || (memberHasPermission('removeTeamMembers'));
 
   const getProfessionalNames = (ids?: string[] | null) => {
     if (!ids || ids.length === 0) return 'Todos os profissionais';
@@ -325,7 +332,7 @@ export default function Team() {
           <TabsContent value="team" className="space-y-6 mt-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end">
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setIsRolesDialogOpen(true)} className="gap-2"><Settings className="h-4 w-4" />Gerenciar Funções</Button>
+                {canManageRoles && <Button variant="outline" onClick={() => setIsRolesDialogOpen(true)} className="gap-2"><Settings className="h-4 w-4" />Gerenciar Funções</Button>}
                 
               </div>
             </div>
@@ -355,11 +362,6 @@ export default function Team() {
                             {getRoleLabels(member).map((label, i) => (
                               <Badge key={i} variant="outline" className={getRoleBadgeColor(member.role_id.split(',')[i]?.trim() || '')}>{label}</Badge>
                             ))}
-                            {member.is_owner && (
-                              <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20 text-xs gap-1">
-                                <Shield className="h-3 w-3" />Todas permissões
-                              </Badge>
-                            )}
                           </div>
                           {member.specialty && (<p className="text-sm text-muted-foreground mt-2 flex items-center gap-1"><Stethoscope className="h-3.5 w-3.5" />{member.specialty}</p>)}
                           <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1 truncate"><Mail className="h-3.5 w-3.5 flex-shrink-0" />{member.email}</p>
@@ -433,7 +435,7 @@ export default function Team() {
           {/* ===== PROCEDIMENTOS TAB ===== */}
           <TabsContent value="procedures" className="space-y-6 mt-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end">
-              <Button onClick={() => { setEditingProc(null); setProcForm({ title: '', description: '', returnInterval: '', returnIntervalUnit: 'months', durationMinutes: '', selectedProfessionals: [] }); setIsProcDialogOpen(true); }} className="gap-2"><Plus className="h-4 w-4" />Novo Procedimento</Button>
+              {canManageProcedures && <Button onClick={() => { setEditingProc(null); setProcForm({ title: '', description: '', returnInterval: '', returnIntervalUnit: 'months', durationMinutes: '', selectedProfessionals: [] }); setIsProcDialogOpen(true); }} className="gap-2"><Plus className="h-4 w-4" />Novo Procedimento</Button>}
             </div>
 
             {proceduresLoading ? (
@@ -445,8 +447,9 @@ export default function Team() {
                 {procedures.map((proc) => (
                   <Card
                     key={proc.id}
-                    className="overflow-hidden transition-all hover:shadow-md cursor-pointer"
+                    className={cn("overflow-hidden transition-all", canManageProcedures && "hover:shadow-md cursor-pointer")}
                     onClick={() => {
+                      if (!canManageProcedures) return;
                       setEditingProc(proc);
                       const converted = proc.return_interval_days ? daysToUnit(proc.return_interval_days) : { value: '', unit: 'months' as const };
                       setProcForm({ title: proc.title, description: proc.description || '', returnInterval: converted.value.toString(), returnIntervalUnit: converted.unit, durationMinutes: proc.duration_minutes ? proc.duration_minutes.toString() : '', selectedProfessionals: proc.professional_ids || [] });
@@ -569,7 +572,7 @@ export default function Team() {
         <DialogContent className="max-w-lg flex flex-col">
           <DialogHeader className="shrink-0"><DialogTitle>{selectedMember ? 'Detalhes do Membro' : 'Adicionar Membro'}</DialogTitle><DialogDescription>{selectedMember ? 'Visualize e gerencie as informações do membro' : 'Adicione um membro diretamente à equipe'}</DialogDescription></DialogHeader>
           {(() => {
-            const actions = selectedMember ? getMemberActions(currentMember, selectedMember) : null;
+            const actions = selectedMember ? getMemberActions(currentMember, selectedMember, roles) : null;
             const isSelf = selectedMember && currentMember && selectedMember.id === currentMember.id;
             const isEditingExisting = !!selectedMember;
 

@@ -28,9 +28,12 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { ManageProceduresDialog } from '@/components/procedures/ManageProceduresDialog';
 import { VariableEditor, type VariableEditorRef } from '@/components/reminders/VariableEditor';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMemberInfo } from '@/hooks/useMemberInfo';
 
 export default function Reminders() {
   const { user } = useAuth();
+  const { hasPermission, isOwner } = useMemberInfo();
+  const canManage = isOwner || hasPermission('manageReminders');
   const { templates: reminderTemplates, addTemplate, updateTemplate, deleteTemplate, isLoading } = useReminderTemplates();
   const { procedures } = useProcedures();
   const [isProceduresOpen, setIsProceduresOpen] = useState(false);
@@ -379,20 +382,24 @@ export default function Reminders() {
                 )}
               </div>
             </div>
-            <Switch checked={isActive} onCheckedChange={() => handleToggleActive(template)} />
+            <Switch checked={isActive} onCheckedChange={() => handleToggleActive(template)} disabled={!canManage} />
           </div>
           <div className="mt-4 flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => handleOpenDialog(template)}>
-              <Pencil className="h-3.5 w-3.5 mr-1" />Editar
-            </Button>
-            {template.type === 'periodic_return' && (
-              <Button variant="outline" size="sm" onClick={() => handleDuplicate(template)}>
-                <Copy className="h-3.5 w-3.5 mr-1" />Duplicar
-              </Button>
+            {canManage && (
+              <>
+                <Button variant="outline" size="sm" onClick={() => handleOpenDialog(template)}>
+                  <Pencil className="h-3.5 w-3.5 mr-1" />Editar
+                </Button>
+                {template.type === 'periodic_return' && (
+                  <Button variant="outline" size="sm" onClick={() => handleDuplicate(template)}>
+                    <Copy className="h-3.5 w-3.5 mr-1" />Duplicar
+                  </Button>
+                )}
+                <Button variant="outline" size="sm" onClick={() => { setTemplateToDelete(template); setIsDeleteDialogOpen(true); }}>
+                  <Trash2 className="h-3.5 w-3.5 mr-1 text-destructive" />Excluir
+                </Button>
+              </>
             )}
-            <Button variant="outline" size="sm" onClick={() => { setTemplateToDelete(template); setIsDeleteDialogOpen(true); }}>
-              <Trash2 className="h-3.5 w-3.5 mr-1 text-destructive" />Excluir
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -411,7 +418,7 @@ export default function Reminders() {
             <h1 className="text-2xl font-bold text-foreground lg:text-3xl">Lembretes</h1>
             <p className="text-muted-foreground">Configure os modelos de mensagens automáticas</p>
           </div>
-          <Button onClick={() => handleOpenDialog()} className="gap-2"><Plus className="h-4 w-4" />Novo Lembrete</Button>
+          {canManage && <Button onClick={() => handleOpenDialog()} className="gap-2"><Plus className="h-4 w-4" />Novo Lembrete</Button>}
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
