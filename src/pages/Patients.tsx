@@ -47,6 +47,7 @@ import { relationLabels, genderLabels, type RelationType, type Gender } from '@/
 import { Plus, Search, Pencil, Trash2, Users, Filter, Loader2 } from 'lucide-react';
 import { format, subYears, parseISO } from 'date-fns';
 import { PatientHistoryDialog } from '@/components/patients/PatientHistoryDialog';
+import { useMemberInfo } from '@/hooks/useMemberInfo';
 
 function HighlightText({ text, query, active }: { text: string; query: string; active: boolean }) {
   if (!active || !query.trim()) return <>{text}</>;
@@ -74,6 +75,11 @@ const filterLabels: Record<SearchFilter, string> = {
 
 export default function Patients() {
   const { patients, addPatient, updatePatient, deletePatient, isLoading } = usePatients();
+  const { hasPermission, isOwner } = useMemberInfo();
+  const canCreate = isOwner || hasPermission('createPatients');
+  const canEdit = isOwner || hasPermission('editPatients');
+  const canDelete = isOwner || hasPermission('deletePatients');
+  const canViewSensitive = isOwner || hasPermission('viewSensitiveData');
   const [searchQuery, setSearchQuery] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -374,10 +380,12 @@ export default function Patients() {
             <h1 className="text-2xl font-bold text-foreground lg:text-3xl">Pacientes</h1>
             <p className="text-muted-foreground">Gerencie os pacientes da sua clínica</p>
           </div>
-          <Button onClick={() => handleOpenDialog()} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Novo Paciente
-          </Button>
+          {canCreate && (
+            <Button onClick={() => handleOpenDialog()} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Novo Paciente
+            </Button>
+          )}
         </div>
 
         {/* Search + Filters */}
@@ -456,8 +464,8 @@ export default function Patients() {
                             </button>
                           </div>
                         </TableCell>
-                        <TableCell>{calculateAge(patient.birth_date)} anos</TableCell>
-                        <TableCell>{patient.has_responsible && patient.responsible_phone ? patient.responsible_phone : patient.phone}</TableCell>
+                        <TableCell>{canViewSensitive ? `${calculateAge(patient.birth_date)} anos` : '••••'}</TableCell>
+                        <TableCell>{canViewSensitive ? (patient.has_responsible && patient.responsible_phone ? patient.responsible_phone : patient.phone) : '••••••••••'}</TableCell>
                         <TableCell>
                           {patient.has_responsible && patient.responsible_name ? (
                             <div>
@@ -475,19 +483,23 @@ export default function Patients() {
                         
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(patient)}>
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setPatientToDelete(patient);
-                                setIsDeleteDialogOpen(true);
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
+                            {canEdit && (
+                              <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(patient)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            )}
+                            {canDelete && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setPatientToDelete(patient);
+                                  setIsDeleteDialogOpen(true);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
